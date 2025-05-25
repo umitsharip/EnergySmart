@@ -89,32 +89,3 @@ def get_urdb_tariffs_by_zip(zip_code, api_key, sector="Residential"):
         })
 
     return pd.DataFrame(rows)
-
-def get_geocode_from_zip(zip_code: str, api_key: str):
-    """
-    Given a ZIP code and a Google Maps API key, returns the latitude and longitude.
-    
-    Args:
-        zip_code (str): The ZIP code to geocode.
-        api_key (str): Your Google Maps API key.
-    
-    Returns:
-        dict: Dictionary with 'lat' and 'lng' or None if not found.
-    """
-    base_url = "https://maps.googleapis.com/maps/api/geocode/json"
-    params = {
-        "address": zip_code,
-        "key": api_key
-    }
-    response = requests.get(base_url, params=params)
-    if response.status_code != 200:
-        print(f"Request failed with status: {response.status_code}")
-        return None
-    
-    data = response.json()
-    if data["status"] != "OK" or not data["results"]:
-        print(f"Geocoding failed: {data['status']}")
-        return None
-    
-    location = data["results"][0]["geometry"]["location"]
-    return {"lat": location["lat"], "lng": location["lng"]}

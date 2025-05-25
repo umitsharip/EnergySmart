@@ -4,6 +4,7 @@ import numpy as np
 import altair as alt
 from urdb_utils import get_filtered_urdb_tariffs_by_zip
 from collections import defaultdict
+from pv_utils import get_pv_generation
 
 st.set_page_config(page_title="Smart Panel ROI Simulator", layout="wide")
 
@@ -15,7 +16,7 @@ st.sidebar.metric("Yearly VPP Earnings", "$85")
 
 API_KEY = "4YeTbE6dmhqqnxt1WeznbYXg5QztPjuRWw766e8D"
 
-GCP_API_KEY = "AIzaSyDXc2YBTobbyySrM-CgMpx5NvkMC3ZAPn0"
+zip_code = "92694"
 
 # Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home Profile", "Utility Setup", "Smart Panel Outcomes", "Load Schedule", "Customize + Save"])
@@ -58,28 +59,80 @@ def collapse_schedule(schedule, rate_structure):
 with tab1:
     st.header("Step 1: Tell us about your home")
 
-    zip_code = st.text_input("ZIP Code", "90210")
+    zip_code = st.text_input("ZIP Code", zip_code)
     sqft = st.slider("Home Size (sqft)", 500, 5000, 1800)
     residents = st.selectbox("Number of Residents", [1, 2, 3, 4, "5+"])
-    has_solar = st.radio("Do you have solar?", ["Yes", "No"])
-    has_battery = st.radio("Do you have a battery?", ["Yes", "No"])
 
-    # EV logic
+    # --- Solar System Details ---
+    has_solar = st.radio("Do you have solar?", ["No", "Yes"])
+    system_kw = 0
+    monthly_generation = []
+
+    if has_solar == "Yes":
+        system_kw = st.number_input("What is your solar panel system capacity? (kW)", min_value=1.0, max_value=20.0, value=3.0, step=1.0)
+
+        manual_or_auto = st.radio("How would you like to provide your monthly solar generation?", ["Estimate for me", "I'll type it"])
+
+        if manual_or_auto == "I'll type it":
+            user_estimate = st.number_input("Estimated monthly solar generation (kWh)", min_value=0.0, step=10.0)
+            monthly_generation = [user_estimate] * 12
+        else:
+            pvwatts_api_key = API_KEY
+            if st.button("Estimate via PVWatts"):
+                if pvwatts_api_key:
+                    try:
+                        monthly_gen, annual_gen, address = get_pv_generation(zip_code, system_kw, pvwatts_api_key)
+                        st.session_state["monthly_pv_gen"] = monthly_gen
+                        st.success(address)
+                        st.success(f"Estimated monthly generation: {round(sum(monthly_gen)/12, 1)} kWh/month")
+                    except Exception as e:
+                        st.error(f"Failed to get estimate: {e}")
+                else:
+                    st.warning("Please enter your PVWatts API key.")
+
+            # if "monthly_pv_gen" in st.session_state:
+            #     st.markdown("#### Estimated Monthly Solar Generation")
+            #     st.bar_chart(pd.Series(st.session_state["monthly_pv_gen"], index=[
+            #         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            #     ]))
+            #     monthly_generation = st.session_state["monthly_pv_gen"]
+
+    # --- Battery ---
+    has_battery = st.radio("Do you have a battery?", ["No", "Yes"])
+    battery_kw = 0
+    if has_battery == "Yes":
+        battery_kw = st.number_input("What is your battery backup capacity? (kW)", min_value=1.0, max_value=30.0, value=10.0, step=0.5)
+
+    # --- EV logic ---
     has_ev = st.radio("Do you own an Electric Vehicle?", ["No", "Yes"])
-    if has_ev == "Yes":
-        num_evs = st.number_input("How many EVs?", min_value=1, max_value=5, value=1, step=1)
-    else:
-        num_evs = 0
+    num_evs = st.number_input("How many EVs?", min_value=1, max_value=5, value=1, step=1) if has_ev == "Yes" else 0
 
-    # Adjusted multiselect without EV
+    # --- Other devices ---
     devices = st.multiselect(
         "Which other energy-intensive devices do you use?",
         ["Heat Pump Water Heater", "Pool Pump", "A/C", "Washer/Dryer"]
     )
 
+    # --- Save everything ---
+    if st.button("Save"):
+        st.session_state["home_profile"] = {
+            "zip_code": zip_code,
+            "sqft": sqft,
+            "residents": residents,
+            "has_solar": has_solar == "Yes",
+            "system_kw": system_kw if has_solar == "Yes" else 0,
+            "monthly_pv_gen": monthly_generation,
+            "has_battery": has_battery == "Yes",
+            "battery_kw": battery_kw if has_battery == "Yes" else 0,
+            "has_ev": has_ev == "Yes",
+            "num_evs": num_evs,
+            "devices": devices
+        }
+        st.session_state["home_profile_complete"] = True
+        st.success("✅ Home Profile Saved!")
+
 with tab2:
     st.header("Step 2: Current Utility Setup")
-    zip_code = st.text_input("Enter ZIP Code", "92694")
     api_key = API_KEY
 
     if "tariff_groups" not in st.session_state:

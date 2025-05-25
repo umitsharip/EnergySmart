@@ -1,0 +1,137 @@
+{
+  "items": [
+    {
+      "label": "6772eeb7739c802b3b0a6f3e",
+      "uri": "https://apps.openei.org/IURDB/rate/view/6772eeb7739c802b3b0a6f3e",
+      "revisions": [1735560263, 1735560313, 1747835902],
+      "approved": true,
+      "is_default": false,
+      "utility": "San Diego Gas & Electric Co",
+      "eiaid": 16609,
+      "name": "EV-TOU-5",
+      "startdate": 1727766000,
+      "supersedes": "663d18fbb8aa427fb70af37b",
+      "sector": "Residential",
+      "servicetype": "Bundled",
+      "description": "Service under this schedule is specifically limited to customers who require service for charging of a currently\r\nregistered Motor Vehicle, as defined by the California Motor Vehicle Code, which is: 1) a battery electric\r\nvehicle (BEV) or plug-in hybrid electric vehicle (PHEV) recharged via a recharging outlet at the customer&#x;fffds\r\npremises; or 2) a natural gas vehicle (NGV) refueled via a home refueling appliance (HRA) at the customer&#x;fffds\r\npremises. This schedule is not available to customers with a conventional charge sustaining (battery\r\nrecharged solely from the vehicle's on-board generator) hybrid electric vehicle (HEV).",
+      "source": "https://www.sdge.com/sites/default/files/regulatory/2-1-25%20Schedule%20EV-TOU-5%20Total%20Rates%20Table.pdf",
+      "sourceparent": "https://www.sdge.com/total-electric-rates",
+      "demandunits": "kW",
+      "energyratestructure": [
+        [
+          {
+            "unit": "kWh",
+            "rate": 0.71106
+          }
+        ],
+        [
+          {
+            "unit": "kWh",
+            "rate": 0.4546
+          }
+        ],
+        [
+          {
+            "unit": "kWh",
+            "rate": 0.12017
+          }
+        ],
+        [
+          {
+            "unit": "kWh",
+            "rate": 0.47772
+          }
+        ],
+        [
+          {
+            "unit": "kWh",
+            "rate": 0.42893
+          }
+        ],
+        [
+          {
+            "unit": "kWh",
+            "rate": 0.11381
+          }
+        ]
+      ],
+      "energyweekdayschedule": [
+        [
+          5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4]
+      ],
+      "energyweekendschedule": [
+        [
+          5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1
+        ],
+        [
+          5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4
+        ],
+        [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 4, 3, 3, 3, 3, 3, 4, 4, 4]
+      ],
+      "energycomments": "Rate Components = Utility Distribution Rate + Department of Water Resources Bond Charge + California Wildfire Fund Charge + Electric Energy Commodity Cost",
+      "dgrules": "Net Metering",
+      "fixedchargefirstmeter": 16,
+      "fixedchargeunits": "$/month",
+      "country": "USA"
+    }
+  ]
+}

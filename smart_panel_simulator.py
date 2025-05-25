@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import altair as alt
+from urdb_utils import get_filtered_urdb_tariffs_by_zip
+from collections import defaultdict
 
 st.set_page_config(page_title="Smart Panel ROI Simulator", layout="wide")
 
@@ -11,25 +13,114 @@ st.sidebar.metric("Est. Monthly Savings", "$62")
 st.sidebar.metric("Payback Period", "18 months")
 st.sidebar.metric("Yearly VPP Earnings", "$85")
 
+API_KEY = "4YeTbE6dmhqqnxt1WeznbYXg5QztPjuRWw766e8D"
+
+GCP_API_KEY = "AIzaSyDXc2YBTobbyySrM-CgMpx5NvkMC3ZAPn0"
+
 # Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home Profile", "Utility Setup", "Smart Panel Outcomes", "Load Schedule", "Customize + Save"])
 
+def hour_to_ampm(hour):
+    """Convert 24h integer to 12h AM/PM format."""
+    suffix = "AM" if hour < 12 else "PM"
+    hour12 = hour % 12
+    hour12 = 12 if hour12 == 0 else hour12
+    return f"{hour12} {suffix}"
+
+def collapse_schedule(schedule, rate_structure):
+    """Collapse hourly schedule into ranges with same rate (12h format)."""
+    if not schedule:
+        return []
+
+    hours = list(range(24))
+    tier_sequence = schedule[0]
+    ranges = []
+    start = 0
+
+    for i in range(1, len(hours)):
+        if tier_sequence[i] != tier_sequence[start]:
+            ranges.append((start, i-1, tier_sequence[start]))
+            start = i
+    ranges.append((start, 23, tier_sequence[start]))
+
+    readable = []
+    for start, end, tier in ranges:
+        try:
+            rate = rate_structure[tier][0].get("rate", "N/A")
+        except:
+            rate = "N/A"
+        readable.append({
+            "Hours": f"{hour_to_ampm(start)} – {hour_to_ampm(end + 1)}",
+            "Rate ($/kWh)": rate
+        })
+    return readable
+
 with tab1:
     st.header("Step 1: Tell us about your home")
+
     zip_code = st.text_input("ZIP Code", "90210")
     sqft = st.slider("Home Size (sqft)", 500, 5000, 1800)
     residents = st.selectbox("Number of Residents", [1, 2, 3, 4, "5+"])
     has_solar = st.radio("Do you have solar?", ["Yes", "No"])
     has_battery = st.radio("Do you have a battery?", ["Yes", "No"])
-    devices = st.multiselect("Which energy-intensive devices do you use?", ["EV", "Heat Pump Water Heater", "Pool Pump", "A/C", "Washer/Dryer"])
+
+    # EV logic
+    has_ev = st.radio("Do you own an Electric Vehicle?", ["No", "Yes"])
+    if has_ev == "Yes":
+        num_evs = st.number_input("How many EVs?", min_value=1, max_value=5, value=1, step=1)
+    else:
+        num_evs = 0
+
+    # Adjusted multiselect without EV
+    devices = st.multiselect(
+        "Which other energy-intensive devices do you use?",
+        ["Heat Pump Water Heater", "Pool Pump", "A/C", "Washer/Dryer"]
+    )
 
 with tab2:
     st.header("Step 2: Current Utility Setup")
-    utility = st.selectbox("Your Utility Provider", ["PG&E", "SCE", "ConEd", "Other"])
-    tariff = st.selectbox("Current Tariff Plan", ["Flat Rate", "TOU-A", "TOU-C", "Unknown"])
-    bill = st.slider("Average Monthly Bill ($)", 50, 1000, 200)
-    rate = st.number_input("Energy Rate ($/kWh, optional)", min_value=0.0, value=0.25, step=0.01)
-    bill_upload = st.file_uploader("Upload Utility Bill (PDF)", type=["pdf"])
+    zip_code = st.text_input("Enter ZIP Code", "92694")
+    api_key = API_KEY
+
+    if "tariff_groups" not in st.session_state:
+        st.session_state.tariff_groups = {}
+
+    if st.button("Fetch Utility Tariffs"):
+        try:
+            st.session_state.tariff_groups = get_filtered_urdb_tariffs_by_zip(zip_code, api_key)
+            st.success("Tariffs fetched successfully.")
+        except Exception as e:
+            st.error(f"Error: {e}")
+
+    if st.session_state.tariff_groups:
+        utilities = [""] + list(st.session_state.tariff_groups.keys())
+        selected_utility = st.selectbox("Select Utility Company", utilities)
+
+        if selected_utility and selected_utility != "":
+            plans = st.session_state.tariff_groups[selected_utility]
+            plan_names = [plan["name"] for plan in plans]
+            selected_plan_name = st.selectbox("Select Tariff Plan", [""] + plan_names)
+
+            if selected_plan_name:
+                selected_plan = next(p for p in plans if p["name"] == selected_plan_name)
+
+                st.markdown(f"### Tariff Plan Overview: **{selected_plan['name']}**")
+                st.write(f"**Fixed Monthly Charge:** {selected_plan['fixedchargefirstmeter']} {selected_plan['fixedchargeunits']}")
+
+                weekday = selected_plan.get("energyweekdayschedule")
+                weekend = selected_plan.get("energyweekendschedule")
+                rates = selected_plan.get("energyratestructure")
+
+                # Compare schedules; if same, collapse and show one
+                if weekday == weekend:
+                    st.markdown("#### Daily Rate Schedule")
+                    collapsed = collapse_schedule(weekday, rates)
+                    st.dataframe(pd.DataFrame(collapsed))
+                else:
+                    st.markdown("#### Weekday Rate Schedule")
+                    st.dataframe(pd.DataFrame(collapse_schedule(weekday, rates)))
+                    st.markdown("#### Weekend Rate Schedule")
+                    st.dataframe(pd.DataFrame(collapse_schedule(weekend, rates)))
 
 with tab3:
     st.header("Step 3: Smart Panel Benefits")

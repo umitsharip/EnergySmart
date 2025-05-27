@@ -6,20 +6,56 @@ from urdb_utils import get_filtered_urdb_tariffs_by_zip
 from collections import defaultdict
 from pv_utils import get_pv_generation
 
-st.set_page_config(page_title="Smart Panel ROI Simulator", layout="wide")
-
-# Sidebar summary
-st.sidebar.header("Your Summary")
-st.sidebar.metric("Est. Monthly Savings", "$62")
-st.sidebar.metric("Payback Period", "18 months")
-st.sidebar.metric("Yearly VPP Earnings", "$85")
-
 API_KEY = "4YeTbE6dmhqqnxt1WeznbYXg5QztPjuRWw766e8D"
-
 zip_code = "92694"
 
+st.set_page_config(page_title="Smart Panel ROI Simulator", layout="wide")
+
+home_done = st.session_state.get("home_profile_complete", False)
+utility_done = st.session_state.get("utility_info_complete", False)
+profile = st.session_state.get("home_profile", {})
+benefit_report = st.session_state.get("benefit_report", {})
+
+# Sidebar summary
+with st.sidebar:
+    st.header("Your summary")
+    # st.header("Potential Energy Smart Benefits")
+
+    # Only show features after Tab 2 is complete
+    # if utility_done:
+    #     has_battery = profile.get("has_battery", False)
+
+    #     st.subheader("🔓 Features Unlocked")
+    #     st.markdown("- ✅ Dynamic Load Balancing")
+    #     st.markdown("- ✅ Maximum EV Charging")
+    #     st.markdown("- ✅ Avoid Expensive Panel Upgrade")
+    #     st.markdown("- ✅ Real-Time Energy Monitor")
+    #     st.markdown("- ✅ TOU Bill Optimization")
+    #     st.markdown("- ✅ Solar Optimization")
+    #     st.markdown("- ✅ Max-Bill Guardrail")
+
+    #     if has_battery:
+    #         st.markdown("- ✅ Outage assist – Critical Load Selection")
+    #         st.markdown("- ✅ Outage assist – Battery Runtime Estimator")
+
+    #     st.markdown("- ✅ Arc / Ground Fault Protection")
+
+    # st.subheader("📊 Key Metrics")
+
+    est_savings = benefit_report.get("monthly_savings", "--")
+    payback = benefit_report.get("payback_period", "--")
+    vpp = benefit_report.get("vpp_earnings", "--")
+
+    st.metric("Est. Monthly Savings", f"${est_savings}" if isinstance(est_savings, (int, float)) else est_savings)
+    st.metric("Payback Period", f"{payback} months" if isinstance(payback, (int, float)) else payback)
+    st.metric("Yearly VPP Earnings", f"${vpp}" if isinstance(vpp, (int, float)) else vpp)
+
 # Tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Home Profile", "Utility Setup", "Smart Panel Outcomes", "Load Schedule", "Customize + Save"])
+tab1_label = "🏠 Home Profile" + (" ✅" if home_done else "")
+tab2_label = "⚡ Utility Setup" + (" ✅" if utility_done else "")
+tab3_label = "📉 Benefit Report"
+tab4_label = "🧪 Deep Dive"
+tab1, tab2, tab3, tab4 = st.tabs([tab1_label, tab2_label, tab3_label, tab4_label])
 
 def hour_to_ampm(hour):
     """Convert 24h integer to 12h AM/PM format."""
@@ -59,11 +95,13 @@ def collapse_schedule(schedule, rate_structure):
 with tab1:
     st.header("Step 1: Tell us about your home")
 
+    st.markdown("🏠 **Home Details**")
     zip_code = st.text_input("ZIP Code", zip_code)
     sqft = st.slider("Home Size (sqft)", 500, 5000, 1800)
     residents = st.selectbox("Number of Residents", [1, 2, 3, 4, "5+"])
 
     # --- Solar System Details ---
+    st.markdown("☀️ **Solar Panel Details**")
     has_solar = st.radio("Do you have solar?", ["No", "Yes"])
     system_kw = 0
     monthly_generation = []
@@ -96,18 +134,47 @@ with tab1:
             #         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
             #     ]))
             #     monthly_generation = st.session_state["monthly_pv_gen"]
+            monthly_generation = st.session_state.get("monthly_pv_gen", [])
 
     # --- Battery ---
-    has_battery = st.radio("Do you have a battery?", ["No", "Yes"])
+    st.markdown("🔋 **Battery System Details**")
+    has_battery = st.radio("Do you have a backup battery system?", ["No", "Yes"])
     battery_kw = 0
+    battery_kwh = 0
+
     if has_battery == "Yes":
-        battery_kw = st.number_input("What is your battery backup capacity? (kW)", min_value=1.0, max_value=30.0, value=10.0, step=0.5)
+        battery_kw = st.number_input(
+            "Continuous discharge rate (kW)", 
+            min_value=1.0, max_value=30.0, value=10.0, step=0.5,
+            help="How much power your battery can continuously supply"
+        )
+        battery_kwh = st.number_input(
+            "Usable battery capacity (kWh)", 
+            min_value=1.0, max_value=100.0, value=13.5, step=1.0,
+            help="Total energy stored, e.g. 13.5 kWh for Tesla Powerwall"
+        )
 
     # --- EV logic ---
+    st.markdown("🚙 **EV Ownership details Details**")
     has_ev = st.radio("Do you own an Electric Vehicle?", ["No", "Yes"])
-    num_evs = st.number_input("How many EVs?", min_value=1, max_value=5, value=1, step=1) if has_ev == "Yes" else 0
+    num_evs = 0
+    ev_weekly_miles = 0
+    ev_monthly_kwh = 0
+
+    if has_ev == "Yes":
+        num_evs = st.number_input("How many EVs?", min_value=1, max_value=5, value=1, step=1)
+
+        ev_weekly_miles = st.number_input(
+            "What is your average total weekly driving distance? (miles)",
+            min_value=0, value=150, step=10
+        )
+
+        ev_monthly_kwh = round((ev_weekly_miles * 4.3) / 3, 1)  # 4.3 weeks/month, 3 mi/kWh
+
+        st.caption(f"🔋 Estimated EV energy usage (estimated EV efficiency 3 miles/kWh): **{ev_monthly_kwh} kWh/month**")
 
     # --- Other devices ---
+    st.markdown("🔌 **Major Loads**")
     devices = st.multiselect(
         "Which other energy-intensive devices do you use?",
         ["Heat Pump Water Heater", "Pool Pump", "A/C", "Washer/Dryer"]
@@ -124,97 +191,192 @@ with tab1:
             "monthly_pv_gen": monthly_generation,
             "has_battery": has_battery == "Yes",
             "battery_kw": battery_kw if has_battery == "Yes" else 0,
+            "battery_kwh": battery_kwh if has_battery == "Yes" else 0,
             "has_ev": has_ev == "Yes",
             "num_evs": num_evs,
+            "ev_weekly_miles": ev_weekly_miles,
+            "ev_monthly_kwh": ev_monthly_kwh,
             "devices": devices
         }
         st.session_state["home_profile_complete"] = True
         st.success("✅ Home Profile Saved!")
 
 with tab2:
-    st.header("Step 2: Current Utility Setup")
-    api_key = API_KEY
+    if not home_done:
+        st.warning("🚧 Please complete your Home Profile first.")
+    else:
+        # Utility Setup UI
+        st.header("Step 2: Current Utility Setup")
+        api_key = API_KEY
 
-    if "tariff_groups" not in st.session_state:
-        st.session_state.tariff_groups = {}
+        if "tariff_groups" not in st.session_state:
+            st.session_state.tariff_groups = {}
 
-    if st.button("Fetch Utility Tariffs"):
-        try:
-            st.session_state.tariff_groups = get_filtered_urdb_tariffs_by_zip(zip_code, api_key)
-            st.success("Tariffs fetched successfully.")
-        except Exception as e:
-            st.error(f"Error: {e}")
+        if st.button("Fetch Utility Tariffs"):
+            try:
+                st.session_state.tariff_groups = get_filtered_urdb_tariffs_by_zip(zip_code, api_key)
+                st.success("Tariffs fetched successfully.")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
-    if st.session_state.tariff_groups:
-        utilities = [""] + list(st.session_state.tariff_groups.keys())
-        selected_utility = st.selectbox("Select Utility Company", utilities)
+        if st.session_state.tariff_groups:
+            utilities = [""] + list(st.session_state.tariff_groups.keys())
+            selected_utility = st.selectbox("Select Utility Company", utilities)
 
-        if selected_utility and selected_utility != "":
-            plans = st.session_state.tariff_groups[selected_utility]
-            plan_names = [plan["name"] for plan in plans]
-            selected_plan_name = st.selectbox("Select Tariff Plan", [""] + plan_names)
+            if selected_utility and selected_utility != "":
+                plans = st.session_state.tariff_groups[selected_utility]
+                plan_names = [plan["name"] for plan in plans]
+                selected_plan_name = st.selectbox("Select Tariff Plan", [""] + plan_names)
 
-            if selected_plan_name:
-                selected_plan = next(p for p in plans if p["name"] == selected_plan_name)
+                if selected_plan_name:
+                    selected_plan = next(p for p in plans if p["name"] == selected_plan_name)
 
-                st.markdown(f"### Tariff Plan Overview: **{selected_plan['name']}**")
-                st.write(f"**Fixed Monthly Charge:** {selected_plan['fixedchargefirstmeter']} {selected_plan['fixedchargeunits']}")
+                    st.markdown(f"### Tariff Plan Overview: **{selected_plan['name']}**")
+                    st.write(f"**Fixed Monthly Charge:** {selected_plan['fixedchargefirstmeter']} {selected_plan['fixedchargeunits']}")
 
-                weekday = selected_plan.get("energyweekdayschedule")
-                weekend = selected_plan.get("energyweekendschedule")
-                rates = selected_plan.get("energyratestructure")
+                    weekday = selected_plan.get("energyweekdayschedule")
+                    weekend = selected_plan.get("energyweekendschedule")
+                    rates = selected_plan.get("energyratestructure")
 
-                # Compare schedules; if same, collapse and show one
-                if weekday == weekend:
-                    st.markdown("#### Daily Rate Schedule")
-                    collapsed = collapse_schedule(weekday, rates)
-                    st.dataframe(pd.DataFrame(collapsed))
-                else:
-                    st.markdown("#### Weekday Rate Schedule")
-                    st.dataframe(pd.DataFrame(collapse_schedule(weekday, rates)))
-                    st.markdown("#### Weekend Rate Schedule")
-                    st.dataframe(pd.DataFrame(collapse_schedule(weekend, rates)))
+                    # Compare schedules; if same, collapse and show one
+                    if weekday == weekend:
+                        st.markdown("#### Daily Rate Schedule")
+                        collapsed = collapse_schedule(weekday, rates)
+                        st.dataframe(pd.DataFrame(collapsed))
+                    else:
+                        st.markdown("#### Weekday Rate Schedule")
+                        st.dataframe(pd.DataFrame(collapse_schedule(weekday, rates)))
+                        st.markdown("#### Weekend Rate Schedule")
+                        st.dataframe(pd.DataFrame(collapse_schedule(weekend, rates)))
+
+                    # --- Average Monthly Bill ---
+                    avg_monthly_bill = st.number_input("What's your average electricity bill per month? ($)", min_value=0.0, value=100.0, step=10.0)
+
+                    if st.button("Save Utility Info"):
+                        st.session_state["utility_info"] = {
+                            "utility": selected_utility,
+                            "tariff": selected_plan,
+                            "avg_monthly_bill": avg_monthly_bill
+                        }
+                        st.session_state["utility_info_complete"] = True
+                        st.success("✅ Utility info saved.")
 
 with tab3:
-    st.header("Step 3: Smart Panel Benefits")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Est. Monthly Bill (Before)", "$200")
-    col2.metric("Est. Monthly Bill (After)", "$138")
-    col3.metric("Est. Annual Savings", "$744")
+    if not utility_done:
+        st.warning("🚧 Complete Utility Setup to access this section.")
+    else:
+        st.header("Step 3: Your Smart-Panel Benefit Report")
 
-    col4, col5, col6 = st.columns(3)
-    col4.metric("Payback Period", "18 months")
-    col5.metric("VPP Earnings (yr)", "$85")
-    col6.metric("Blackout Runtime", "8 hours")
+        profile   = st.session_state["home_profile"]
+        utility   = st.session_state["utility_info"]
+        base_bill = utility["avg_monthly_bill"]
 
-    st.subheader("Estimated Peak Load Reduction")
-    st.progress(0.45)
+        # ---------- % assumptions backed by public studies ----------
+        pct_tou        = 0.15   # 15 % TOU shift, mid-range of 10-25 % :contentReference[oaicite:0]{index=0}
+        pct_monitor    = 0.05   # 5 % behaviour drop (ENERGYSTAR smart-meter study 3-8 %) :contentReference[oaicite:1]{index=1}
+        pct_batt_peak  = 0.07   # 7 % peak-shave midpoint 5-10 % :contentReference[oaicite:2]{index=2}
+        pct_solar_opt  = 0.05   # 5 % extra self-use (NEM 3.0 optimiser, utility white-paper)
+        pct_dynamic_ev = 0.00   # convenience feature – no direct bill line item here
 
-    st.subheader("CO₂ Avoided Annually")
-    st.metric("Estimated Savings", "520 kg")
+        vpp_annual     = 100    # California DR/VPP typical $50-$150 :contentReference[oaicite:3]{index=3}
+        hardware_cost  = 1800   # assumed installed retrofit kit cost ($)
+
+        # ---------- Which savings apply? ----------
+        total_pct = 0
+        monetary  = []
+        lifestyle = []
+        safety    = []
+
+        # ➜ Cost-cutting features (include % in **green bold**)
+        monetary.append((f"TOU Bill Optimization (**<span style='color:green;font-weight:bold'>{int(pct_tou*100)} %</span>**)",
+                         "Schedules flexible loads (EV, HPWH, pool) into off-peak windows."))
+
+        monetary.append((f"Real-Time Energy Monitor (**<span style='color:green;font-weight:bold'>{int(pct_monitor*100)} %</span>**)",
+                         "Live $/hr cost nudges smarter behaviour."))
+
+        monetary.append(("Tariff Advisor",
+                         "Every month the panel analyses your usage and recommends the cheapest plan available."))
+
+        monetary.append(("Avoid Panel-Upgrade (Dynamic Load Balancing)",
+                         "Staggers big appliances so the main breaker never overloads — avoids a $3-5 k panel upsizing."))
+
+        if profile["has_solar"]:
+            monetary.append((f"Solar Export Optimizer (NEM 3.0) (**<span style='color:green;font-weight:bold'>{int(pct_solar_opt*100)} %</span>**)",
+                             "Uses midday surplus to charge EV / battery, slashing low-value exports."))
+
+        if profile["has_battery"]:
+            monetary.append((f"Battery Peak Shaving (**<span style='color:green;font-weight:bold'>{int(pct_batt_peak*100)} %</span>**)",
+                             "Discharges for the 3-4 priciest hours each day."))
+            safety.append(("Outage assist – Critical-Load Selection",
+                           "Choose which breakers stay powered when the grid goes down."))
+            safety.append(("Outage assist – Battery Runtime Estimator",
+                           f"Based on your {profile['battery_kwh']} kWh pack, shows remaining backup hours."))
+
+        monetary.append((f"VPP Revenue Toggle (**<span style='color:green;font-weight:bold'>${vpp_annual}/yr</span>**)",
+                        "Opt-in to utility demand-response events."))
+
+        if profile["has_ev"]:
+            lifestyle.append(("Dynamic EV Charge Speed",
+                              "Auto-ramps amps up when the house is quiet, finishes faster without trips."))
+
+        safety.extend([
+            ("Arc / Ground-Fault Protection", "High-frequency DSP catches wiring faults in <50 ms."),
+            ("Millisecond Islanding", "Keeps lights on during a blackout without a clunky transfer switch.")
+        ])
+
+        # ---------- Calculate dollar impact ----------
+        # add each % only if that feature is in the list above
+        total_pct += pct_tou
+        total_pct += pct_monitor
+        if profile["has_battery"]:
+            total_pct += pct_batt_peak
+        if profile["has_solar"]:
+            total_pct += pct_solar_opt
+
+        monthly_savings = round(base_bill * total_pct, 2)
+        after_bill      = round(base_bill - monthly_savings, 2)
+        payback_months  = round(hardware_cost / (monthly_savings + vpp_annual/12), 1) if (monthly_savings + vpp_annual/12) else "—"
+
+        # ---------- Show headline metrics ----------
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Monthly Bill (Before)", f"${base_bill}")
+        col2.metric("Monthly Bill Estimated (After)",  f"${after_bill}")
+        col3.metric("Monthly Estimated Savings",       f"${monthly_savings}")
+
+        col4, col5, col6 = st.columns(3)
+        col4.metric("Payback Period",   f"{payback_months} months")
+        col5.metric("VPP Earnings",     f"${vpp_annual}/yr")
+        col6.metric("Annual Net Gain",  f"${round(monthly_savings*12+vpp_annual,0)}")
+
+        st.markdown("---")
+
+        # ---------- Display feature sections ----------
+        def section(title, items):
+            if items:
+                st.subheader(title)
+                for name, desc in items:
+                    st.markdown(f"**• {name}**  \n{desc}", unsafe_allow_html=True)
+
+        section("💵 Cost-Cutting & Earnings Estimates", monetary)
+        section("🛋️  Comfort & Convenience", lifestyle)
+        section("🛡️  Safety & Resilience", safety)
+
+        # ---------- Update sidebar ----------
+        st.session_state["benefit_report"] = {
+            "monthly_savings": monthly_savings,
+            "payback_period":  payback_months,
+            "vpp_earnings":    vpp_annual
+        }
 
 with tab4:
-    st.header("Step 4: Load Schedule Optimization")
-    st.caption("Below is a simulated daily schedule showing how smart panel shifts usage to save costs.")
-    hours = list(range(24))
-    usage_before = [np.random.randint(2, 8) if 17 <= h <= 21 else np.random.randint(1, 4) for h in hours]
-    usage_after = [x - 1 if 17 <= h <= 21 else x + 0.5 for h, x in enumerate(usage_before)]
-    df = pd.DataFrame({"Hour": hours, "Before Smart Panel": usage_before, "After Smart Panel": usage_after})
-    df_melt = df.melt("Hour", var_name="Scenario", value_name="kWh Used")
+    if not utility_done:
+        st.warning("🚧 Complete Utility Setup to access this section.")
+    else:
+        # Customization options
+        st.header("Step 4: Deep Dive")
+        budget_cap = st.number_input("Monthly Budget Cap ($)", value=150)
+        critical_loads = st.multiselect("Which loads should stay on during blackouts?", ["Fridge", "Wi-Fi", "Lighting", "Medical Devices"])
+        goal = st.radio("Your Priority", ["Lower Bills", "Resilience", "Max ROI"])
+        st.download_button("Download My Smart Panel Plan (PDF)", data="Simulated PDF output", file_name="smart_panel_plan.pdf")
 
-    chart = alt.Chart(df_melt).mark_line(point=True).encode(
-        x="Hour",
-        y="kWh Used",
-        color="Scenario"
-    ).properties(width=700, height=400)
-
-    st.altair_chart(chart)
-
-with tab5:
-    st.header("Step 5: Customize and Save")
-    budget_cap = st.number_input("Monthly Budget Cap ($)", value=150)
-    critical_loads = st.multiselect("Which loads should stay on during blackouts?", ["Fridge", "Wi-Fi", "Lighting", "Medical Devices"])
-    goal = st.radio("Your Priority", ["Lower Bills", "Resilience", "Max ROI"])
-    st.download_button("Download My Smart Panel Plan (PDF)", data="Simulated PDF output", file_name="smart_panel_plan.pdf")
-
-    st.success("Your plan is ready! You can share this with your installer.")
+        st.success("Your plan is ready! You can share this with your installer.")

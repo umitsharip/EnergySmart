@@ -1,3 +1,4 @@
+from io import BytesIO
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,6 +6,7 @@ import altair as alt
 from urdb_utils import get_filtered_urdb_tariffs_by_zip
 from collections import defaultdict
 from pv_utils import get_pv_generation
+from greenbutton_utils import parse_green_button_xml
 
 API_KEY = "4YeTbE6dmhqqnxt1WeznbYXg5QztPjuRWw766e8D"
 zip_code = "92694"
@@ -14,7 +16,6 @@ st.set_page_config(page_title="Smart Panel ROI Simulator", layout="wide")
 home_done = st.session_state.get("home_profile_complete", False)
 utility_done = st.session_state.get("utility_info_complete", False)
 profile = st.session_state.get("home_profile", {})
-benefit_report = st.session_state.get("benefit_report", {})
 
 # Sidebar summary
 with st.sidebar:
@@ -41,14 +42,14 @@ with st.sidebar:
     #     st.markdown("- ✅ Arc / Ground Fault Protection")
 
     # st.subheader("📊 Key Metrics")
-
+    benefit_report = st.session_state.get("benefit_report", {})
     est_savings = benefit_report.get("monthly_savings", "--")
-    payback = benefit_report.get("payback_period", "--")
-    vpp = benefit_report.get("vpp_earnings", "--")
+    payback     = benefit_report.get("payback_period", "--")
+    vpp         = benefit_report.get("vpp_earnings", "--")
 
-    st.metric("Est. Monthly Savings", f"${est_savings}" if isinstance(est_savings, (int, float)) else est_savings)
-    st.metric("Payback Period", f"{payback} months" if isinstance(payback, (int, float)) else payback)
-    st.metric("Yearly VPP Earnings", f"${vpp}" if isinstance(vpp, (int, float)) else vpp)
+    st.metric("Est. Monthly Savings", f"~${est_savings}" if isinstance(est_savings, (int, float)) else est_savings)
+    st.metric("Payback Period", f"~{payback} months" if isinstance(payback, (int, float)) else payback)
+    st.metric("Yearly VPP Earnings", f"~${vpp}" if isinstance(vpp, (int, float)) else vpp)
 
 # Tabs
 tab1_label = "🏠 Home Profile" + (" ✅" if home_done else "")
@@ -324,32 +325,6 @@ with tab3:
             ("Millisecond Islanding", "Keeps lights on during a blackout without a clunky transfer switch.")
         ])
 
-        # ---------- Calculate dollar impact ----------
-        # add each % only if that feature is in the list above
-        total_pct += pct_tou
-        total_pct += pct_monitor
-        if profile["has_battery"]:
-            total_pct += pct_batt_peak
-        if profile["has_solar"]:
-            total_pct += pct_solar_opt
-
-        monthly_savings = round(base_bill * total_pct, 2)
-        after_bill      = round(base_bill - monthly_savings, 2)
-        payback_months  = round(hardware_cost / (monthly_savings + vpp_annual/12), 1) if (monthly_savings + vpp_annual/12) else "—"
-
-        # ---------- Show headline metrics ----------
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Monthly Bill (Before)", f"${base_bill}")
-        col2.metric("Monthly Bill Estimated (After)",  f"${after_bill}")
-        col3.metric("Monthly Estimated Savings",       f"${monthly_savings}")
-
-        col4, col5, col6 = st.columns(3)
-        col4.metric("Payback Period",   f"{payback_months} months")
-        col5.metric("VPP Earnings",     f"${vpp_annual}/yr")
-        col6.metric("Annual Net Gain",  f"${round(monthly_savings*12+vpp_annual,0)}")
-
-        st.markdown("---")
-
         # ---------- Display feature sections ----------
         def section(title, items):
             if items:
@@ -361,22 +336,119 @@ with tab3:
         section("🛋️  Comfort & Convenience", lifestyle)
         section("🛡️  Safety & Resilience", safety)
 
-        # ---------- Update sidebar ----------
-        st.session_state["benefit_report"] = {
-            "monthly_savings": monthly_savings,
-            "payback_period":  payback_months,
-            "vpp_earnings":    vpp_annual
-        }
+        st.markdown("---")
+
+        st.write("Click to run the estimate:")
+
+        if st.button("💰 Estimate my savings"):
+            # ---------- % assumptions ----------
+            profile   = st.session_state["home_profile"]
+            utility   = st.session_state["utility_info"]
+            base_bill = utility["avg_monthly_bill"]
+
+            # ---------- Savings math ----------
+            total_pct = pct_tou + pct_monitor
+            if profile["has_battery"]: total_pct += pct_batt_peak
+            if profile["has_solar"]:   total_pct += pct_solar_opt
+
+            monthly_savings = round(base_bill * total_pct, 2)
+            after_bill      = round(base_bill - monthly_savings, 2)
+            payback_months  = round(hardware_cost / (monthly_savings + vpp_annual/12), 1)
+
+            # ---------- Headline metrics ----------
+            st.markdown("### Results")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Monthly Bill (Before)", f"${base_bill}")
+            col2.metric("Monthly Bill (After)", f"~${after_bill}")
+            col3.metric("Monthly Estimated Savings", f"~${monthly_savings}")
+
+            col4, col5, col6 = st.columns(3)
+            col4.metric("Payback Period", f"~{payback_months} months")
+            col5.metric("VPP Earnings", f"~${vpp_annual}/yr")
+            col6.metric("Annual Savings", f"~${round(monthly_savings*12+vpp_annual,0)}")
+
+            # ---------- Save for sidebar ----------
+            st.session_state["benefit_report"] = {
+                "monthly_savings": monthly_savings,
+                "payback_period":  payback_months,
+                "vpp_earnings":    vpp_annual
+            }
+
+            st.success("Estimated savings!")
 
 with tab4:
     if not utility_done:
         st.warning("🚧 Complete Utility Setup to access this section.")
     else:
-        # Customization options
-        st.header("Step 4: Deep Dive")
-        budget_cap = st.number_input("Monthly Budget Cap ($)", value=150)
-        critical_loads = st.multiselect("Which loads should stay on during blackouts?", ["Fridge", "Wi-Fi", "Lighting", "Medical Devices"])
-        goal = st.radio("Your Priority", ["Lower Bills", "Resilience", "Max ROI"])
-        st.download_button("Download My Smart Panel Plan (PDF)", data="Simulated PDF output", file_name="smart_panel_plan.pdf")
+        st.header("Step 4: Deep Dive — Real Usage Analysis (California only)")
+        st.info("⚠️ Detailed bill modelling currently supports CA utilities that provide "
+                "Green Button ‘Download My Data’ XML files.")
 
-        st.success("Your plan is ready! You can share this with your installer.")
+        # -------- Upload or sample file ----------
+        gb_file = st.file_uploader("Upload your Green Button XML", type=("xml",))
+        sample_link = ("https://s3-us-west-2.amazonaws.com/"
+                       "technical.greenbuttonalliance.org/library/sample-data/"
+                       "Coastal_Multi_Family_Jan_1_2011_to_Jan_1_2012_RetailCustomer_5.xml")
+
+        if gb_file is None:
+            if st.button("🔍 Load sample data"):
+                import requests, tempfile, os
+                r = requests.get(sample_link, timeout=10)
+                if r.ok:
+                    gb_file = BytesIO(r.content)
+                    st.success("Sample loaded.")
+                else:
+                    st.error("Failed to fetch sample.")
+
+        if gb_file:
+            try:
+                df = parse_green_button_xml(gb_file.read())
+            except Exception as e:
+                st.error(f"Could not parse XML: {e}")
+                st.stop()
+
+            # --------- Basic stats ----------
+            annual_kwh = round(df["kWh"].sum(), 1)
+            daily_avg  = round(df["kWh"].resample("D").sum().mean(), 2)
+            st.success(f"{len(df):,} intervals • {annual_kwh} kWh/yr • ~{daily_avg} kWh/day")
+
+            # --------- Plot average daily profile ----------
+            daily_shape = df.groupby(df.index.hour)["kWh"].mean().reset_index()
+            st.altair_chart(
+                alt.Chart(daily_shape).mark_area().encode(
+                    x=alt.X("timestamp:O", title="Hour"),
+                    y=alt.Y("kWh:Q", title="Avg kWh")
+                ).properties(width=650, height=280), use_container_width=True)
+
+            # --------- Peak vs. off-peak split ----------
+            plan = st.session_state["utility_info"]["tariff"]
+            weekday_sched = plan["energyweekdayschedule"][0]  # list of 24 ints
+            peak_tier     = max(weekday_sched)
+            peak_hours    = [h for h, t in enumerate(weekday_sched) if t == peak_tier]
+
+            df["is_peak"] = df.index.hour.isin(peak_hours)
+            peak_kwh  = df[df.is_peak]["kWh"].sum()
+            off_kwh   = df[~df.is_peak]["kWh"].sum()
+            st.write(f"**Load split:** {peak_kwh/annual_kwh:.1%} peak • {off_kwh/annual_kwh:.1%} off-peak")
+
+            # --------- Quick cost-before vs cost-after demo ----------
+            peak_rate = plan["energyratestructure"][peak_tier][0]["rate"]
+            off_rate  = plan["energyratestructure"][min(weekday_sched)][0]["rate"]
+            cost_today = peak_kwh*peak_rate + off_kwh*off_rate
+
+            shifted_kwh = peak_kwh * 0.40   # assume 40 % shift
+            new_peak_kwh = peak_kwh - shifted_kwh
+            new_off_kwh  = off_kwh + shifted_kwh
+            cost_after   = new_peak_kwh*peak_rate + new_off_kwh*off_rate
+
+            st.metric("Annual Cost (today)",     f"${cost_today:,.0f}")
+            st.metric("Projected Cost (Smart Panel)", f"${cost_after:,.0f}",
+                      delta=f"-${cost_today - cost_after:,.0f}")
+
+            # ---------- Tariff recommendation mock ----------
+            st.divider()
+            st.subheader("Tariff Recommendation (demo)")
+            st.write("Based on your 8760-hour profile we scanned 45 residential tariffs "
+                     "in your ZIP and found **EV-TOU-5** would shave another **$120 / yr** "
+                     "if EV charging stays off-peak.")
+
